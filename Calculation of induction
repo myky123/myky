@@ -1,0 +1,615 @@
+classdef PP_Final < matlab.apps.AppBase
+
+    % Properties that correspond to app components
+    properties (Access = public)
+        UIFigure                    matlab.ui.Figure
+        PoiatonpolomerkstreduprvhozvituLabel  matlab.ui.control.Label
+        Polomer1                    matlab.ui.control.NumericEditField
+        KonenpolomerkstreduposlednhozvituLabel  matlab.ui.control.Label
+        Polomer2                    matlab.ui.control.NumericEditField
+        LabelNumericEditField3      matlab.ui.control.Label
+        Sirka                       matlab.ui.control.NumericEditField
+        rkamedzerymedzivodimiLabel  matlab.ui.control.Label
+        Medzera                     matlab.ui.control.NumericEditField
+        LabelNumericEditField5      matlab.ui.control.Label
+        HrubkaV                     matlab.ui.control.NumericEditField
+        LabelNumericEditField6      matlab.ui.control.Label
+        Hrubka1                     matlab.ui.control.NumericEditField
+        LabelNumericEditField7      matlab.ui.control.Label
+        Hrubka2                     matlab.ui.control.NumericEditField
+        LabelNumericEditField8      matlab.ui.control.Label
+        Hrubka3                     matlab.ui.control.NumericEditField
+        VsledninduknoscievkyLabel   matlab.ui.control.Label
+        Result                      matlab.ui.control.NumericEditField
+        mmLabel_9                   matlab.ui.control.Label
+        mmLabel_10                  matlab.ui.control.Label
+        mmLabel_3                   matlab.ui.control.Label
+        mmLabel_4                   matlab.ui.control.Label
+        mmLabel_5                   matlab.ui.control.Label
+        mmLabel_6                   matlab.ui.control.Label
+        mmLabel_7                   matlab.ui.control.Label
+        mmLabel_8                   matlab.ui.control.Label
+        HLabel                      matlab.ui.control.Label
+        Poetzvitovv1a3vrstveEditFieldLabel  matlab.ui.control.Label
+        Zavity1                     matlab.ui.control.NumericEditField
+        Poetzvitovv2a4vrstveEditFieldLabel  matlab.ui.control.Label
+        Zavity2                     matlab.ui.control.NumericEditField
+        Vpoetinduknostiplanrnejcievky4vrstvyLabel  matlab.ui.control.Label
+        ZadapoetzvitovLabel         matlab.ui.control.Label
+        Zavity                      matlab.ui.control.NumericEditField
+        Label                       matlab.ui.control.Label
+        TextArea                    matlab.ui.control.TextArea
+    end
+
+
+    methods (Access = private)
+        
+        function Inductance(app)
+            
+rvst = app.Polomer1.Value;
+a0 = app.Sirka.Value;
+y = app.Medzera.Value;
+h = app.HrubkaV.Value;
+vr1 = app.Hrubka1.Value;
+vr2 = app.Hrubka2.Value;
+vr3 = app.Hrubka3.Value;
+N = app.Zavity.Value;
+
+            
+rvst = rvst*1e-3;
+a0 = a0*1e-3;
+y = y*1e-3;
+h = h*1e-3;
+vr1 = vr1*1e-3;
+vr2 = vr2*1e-3;
+vr3 = vr3*1e-3;
+
+% Permeabilita 
+mi0 = 4*pi*1e-7;
+
+% Stredna geometricka vzdialenost 
+R = a0*exp(-3/2);  % a0 - sirka vodica
+
+rstep = a0 + y; % Definovanie hodnoty kroku pre zistenie stredov polomerov dalsich zavitov
+
+
+if  N == 0
+    rvyst = app.Polomer2.Value;
+    rvyst = rvyst*1e-3;
+    rvyst = rvyst + a0/2; % ku koncu posledneho zavitu
+   if rvyst - a0/2 <= rvst + a0 + y
+    app.Polomer2.Value = 0;
+    app.Result.Value = 0;
+    app.Zavity1.Value = 0;
+    app.Zavity2.Value = 0;
+    return;
+   end
+    r1 = rvst:rstep:rvyst; 
+    rvst2 = rvst + y/2 + a0/2;
+    rvyst2 = rvyst - a0/2 - y/2;  
+    r2 = rvst2:rstep:rvyst2;
+else
+    rvyst = rvst + (N-1) * rstep + a0/2; 
+    rvysts = rvyst - a0/2 ; % konecny polomer k stredu posledneho zavitu
+    rround = round(rvysts,6);
+    r1 = rvst:rstep:rvyst;
+    rvst2 = rvst + y/2 + a0/2;
+    rvyst2 = r1(end) - a0/2 - y/2; 
+    app.Polomer2.Value = rround*1e3; 
+    r2 = rvst2:rstep:rvyst2;
+end
+%%  1. vrstva
+%%
+
+% Hodnoty polomerov vo vektorovej forme
+A1 = r1 - (R/2); 
+a1 = r1 + (R/2);
+
+%% 2.vrstva
+%%
+
+% Hodnoty polomerov vo vektorovej forme
+A2 = r2 - (R/2); 
+a2 = r2 + (R/2);
+
+%% Indukcnost 1.vrstvy
+for i = 1:length(r1)   
+    for j = 1:length(r1)
+        
+        if i == j
+           r11 = A1(i);
+           r12 = a1(i);
+        else
+           r11 = r1(i);
+           r12 = r1(j);
+        end
+  
+  kv1(i,j) = (2*sqrt(r11*r12))/(sqrt((r11+r12)^2)); % b som vynechal (b = 0)   k0(i) = (2*sqrt(A(i)*a(i)))/sqrt((A(i)+a(i)^2+b(i)^2));
+  kv1 = kv1(i,j);
+
+  [Kv1(i,j),Ev1(i,j)] = ellipke(kv1.^2); % Elipticke integraly 1. a 2. druhu
+  Kv1 = Kv1(i,j);Ev1 = Ev1(i,j);     
+  
+  B11(i,j) = -mi0*sqrt(r11*r12)*((kv1-2/kv1)*Kv1+2/kv1*Ev1);  % Vysledna matica vzajomnej indukcnosti
+
+    end
+end
+
+%% Indukcnost 2.vrstvy
+for i = 1:length(r2)   
+    for j = 1:length(r2)
+        
+        if i == j
+           r21 = A2(i);
+           r22 = a2(i);
+        else
+           r21 = r2(i);
+           r22 = r2(j);
+        end
+  
+  kv2(i,j) = (2*sqrt(r21*r22))/(sqrt((r21+r22)^2)); % b som vynechal (b = 0)   k0(i) = (2*sqrt(A(i)*a(i)))/sqrt((A(i)+a(i)^2+b(i)^2));
+  kv2 = kv2(i,j);
+
+  [Kv2(i,j),Ev2(i,j)] = ellipke(kv2.^2); % Elipticke integraly 1. a 2. druhu
+  Kv2 = Kv2(i,j);Ev2 = Ev2(i,j);     
+  
+  B22(i,j) = -mi0*sqrt(r21*r22)*((kv2-2/kv2)*Kv2+2/kv2*Ev2);  % Vysledna matica vzajomnej indukcnosti
+
+    end
+end
+
+%% Indukcnost medzi vrstvami
+
+b1 = [h+vr1,3*h+vr1+vr2+vr3,h+vr2,h+vr3]; % ,2*h+vr1+vr2,2*h+vr2+vr3];
+b2 = [2*h+vr1+vr2];
+b3 = [2*h+vr2+vr3];
+
+for i = 1:length(r1)   
+    for j = 1:length(r2)
+        
+  k11{i,j} = (2*sqrt(r1(i)*r2(j)))./(sqrt((r1(i)+r2(j))^2 + b1.^2)); 
+  
+  % Elipticky integral 1. a 2. druhu
+  [K11{i,j},E11{i,j}] = ellipke(k11{i,j}.^2);
+
+  %% Vysledne pole vzajomnej indukcnosti
+  B1{i,j} = -mi0*sqrt(r1(i)*r2(j))*((k11{i,j}-2./k11{i,j}).*K11{i,j}+2./k11{i,j}.*E11{i,j}); 
+  
+    end
+end
+
+for i = 1:length(r1)   
+    for j = 1:length(r1)
+        
+  k22{i,j} = (2*sqrt(r1(i)*r1(j)))./(sqrt((r1(i)+r1(j))^2 + b2.^2)); 
+  
+  % Elipticky integral 1. a 2. druhu
+  [K22{i,j},E22{i,j}] = ellipke(k22{i,j}.^2);
+
+  %% Vysledne pole vzajomnej indukcnosti
+  B2{i,j} = -mi0*sqrt(r1(i)*r1(j))*((k22{i,j}-2./k22{i,j}).*K22{i,j}+2./k22{i,j}.*E22{i,j}); 
+  
+    end
+end
+
+for i = 1:length(r2)   
+    for j = 1:length(r2)
+        
+  k33{i,j} = (2*sqrt(r2(i)*r2(j)))./(sqrt((r2(i)+r2(j))^2 + b3.^2)); 
+  
+  % Elipticky integral 1. a 2. druhu
+  [K33{i,j},E33{i,j}] = ellipke(k33{i,j}.^2);
+
+  %% Vysledne pole vzajomnej indukcnosti
+  B3{i,j} = -mi0*sqrt(r2(i)*r2(j))*((k33{i,j}-2./k33{i,j}).*K33{i,j}+2./k33{i,j}.*E33{i,j}); 
+  
+    end
+end
+
+ B12 = cell2mat(cellfun(@(x)(x(1)), B1, 'UniformOutput', false));
+ B14 = cell2mat(cellfun(@(x)(x(2)), B1, 'UniformOutput', false));
+ B32 = cell2mat(cellfun(@(x)(x(3)), B1, 'UniformOutput', false));
+ B34 = cell2mat(cellfun(@(x)(x(4)), B1, 'UniformOutput', false));
+ 
+ B13 = cell2mat(cellfun(@(x)(x(1)), B2, 'UniformOutput', false));
+ 
+ B24 = cell2mat(cellfun(@(x)(x(1)), B3, 'UniformOutput', false));
+ 
+ %% Vysledne usporiadanie do matice
+ 
+ C = [B11,B12,B13,B14;B12',B22,B32',B24;B13',B32,B11,B34;B14',B24',B34',B22];
+ D = sum(sum(C))*1e6;
+
+
+ Z1 = length(r1);
+ Z2 = length(r2);
+ app.Result.Value = D;
+ app.Zavity1.Value = Z1;
+ app.Zavity2.Value = Z2;
+ 
+        end
+
+    end
+
+
+    methods (Access = private)
+
+        % Code that executes after component creation
+        function startupFcn(app)
+            
+        end
+
+        % Value changed function: Hrubka1
+        function Hrubka1ValueChanged(app, event)
+            Inductance(app);
+            
+        end
+
+        % Value changed function: Hrubka2
+        function Hrubka2ValueChanged(app, event)
+            Inductance(app);
+            
+        end
+
+        % Value changed function: Hrubka3
+        function Hrubka3ValueChanged(app, event)
+            Inductance(app);
+            
+        end
+
+        % Value changed function: HrubkaV
+        function HrubkaVValueChanged(app, event)
+            Inductance(app);
+            
+        end
+
+        % Value changed function: Medzera
+        function MedzeraValueChanged(app, event)
+            Inductance(app);
+            
+        end
+
+        % Value changed function: Polomer1
+        function Polomer1ValueChanged(app, event)
+            Inductance(app);
+            
+        end
+
+        % Value changed function: Polomer2
+        function Polomer2ValueChanged(app, event)
+            Inductance(app);
+            
+        end
+
+        % Value changed function: Sirka
+        function SirkaValueChanged(app, event)
+            Inductance(app);
+            
+        end
+
+        % Value changed function: Zavity1
+        function Zavity1ValueChanged(app, event)
+            Inductance(app);
+            
+        end
+
+        % Value changed function: Zavity2
+        function Zavity2ValueChanged(app, event)
+            Inductance(app);
+            
+        end
+
+        % Value changed function: Zavity
+        function ZavityValueChanged(app, event)
+            Inductance(app);
+            
+        end
+    end
+
+    % App initialization and construction
+    methods (Access = private)
+
+        % Create UIFigure and components
+        function createComponents(app)
+
+            % Create UIFigure
+            app.UIFigure = uifigure;
+            app.UIFigure.Colormap = [0.243137254901961 0.149019607843137 0.658823529411765;0.250980392156863 0.164705882352941 0.705882352941177;0.258823529411765 0.180392156862745 0.752941176470588;0.266666666666667 0.196078431372549 0.796078431372549;0.270588235294118 0.215686274509804 0.835294117647059;0.274509803921569 0.235294117647059 0.870588235294118;0.27843137254902 0.254901960784314 0.898039215686275;0.27843137254902 0.27843137254902 0.92156862745098;0.282352941176471 0.301960784313725 0.941176470588235;0.282352941176471 0.32156862745098 0.956862745098039;0.27843137254902 0.345098039215686 0.972549019607843;0.274509803921569 0.368627450980392 0.984313725490196;0.270588235294118 0.388235294117647 0.992156862745098;0.258823529411765 0.411764705882353 0.996078431372549;0.243137254901961 0.435294117647059 1;0.219607843137255 0.458823529411765 0.996078431372549;0.196078431372549 0.486274509803922 0.988235294117647;0.184313725490196 0.505882352941176 0.980392156862745;0.180392156862745 0.529411764705882 0.968627450980392;0.176470588235294 0.549019607843137 0.952941176470588;0.168627450980392 0.568627450980392 0.937254901960784;0.152941176470588 0.592156862745098 0.92156862745098;0.145098039215686 0.607843137254902 0.909803921568627;0.137254901960784 0.627450980392157 0.898039215686275;0.125490196078431 0.647058823529412 0.890196078431373;0.109803921568627 0.662745098039216 0.874509803921569;0.0941176470588235 0.67843137254902 0.858823529411765;0.0705882352941176 0.694117647058824 0.83921568627451;0.0313725490196078 0.709803921568627 0.815686274509804;0.00392156862745098 0.72156862745098 0.792156862745098;0.00784313725490196 0.729411764705882 0.764705882352941;0.0431372549019608 0.741176470588235 0.741176470588235;0.0980392156862745 0.749019607843137 0.713725490196078;0.141176470588235 0.756862745098039 0.682352941176471;0.172549019607843 0.768627450980392 0.654901960784314;0.192156862745098 0.776470588235294 0.623529411764706;0.215686274509804 0.784313725490196 0.592156862745098;0.247058823529412 0.792156862745098 0.556862745098039;0.290196078431373 0.796078431372549 0.517647058823529;0.341176470588235 0.8 0.47843137254902;0.392156862745098 0.803921568627451 0.435294117647059;0.447058823529412 0.803921568627451 0.392156862745098;0.505882352941176 0.8 0.349019607843137;0.56078431372549 0.796078431372549 0.305882352941176;0.615686274509804 0.788235294117647 0.262745098039216;0.670588235294118 0.780392156862745 0.223529411764706;0.725490196078431 0.768627450980392 0.192156862745098;0.772549019607843 0.76078431372549 0.164705882352941;0.819607843137255 0.749019607843137 0.152941176470588;0.862745098039216 0.741176470588235 0.16078431372549;0.901960784313726 0.733333333333333 0.176470588235294;0.941176470588235 0.729411764705882 0.211764705882353;0.972549019607843 0.729411764705882 0.23921568627451;0.996078431372549 0.745098039215686 0.235294117647059;0.996078431372549 0.764705882352941 0.219607843137255;0.996078431372549 0.788235294117647 0.203921568627451;0.988235294117647 0.811764705882353 0.188235294117647;0.980392156862745 0.83921568627451 0.176470588235294;0.968627450980392 0.862745098039216 0.164705882352941;0.96078431372549 0.890196078431373 0.152941176470588;0.96078431372549 0.913725490196078 0.141176470588235;0.964705882352941 0.937254901960784 0.125490196078431;0.968627450980392 0.96078431372549 0.105882352941176;0.980392156862745 0.980392156862745 0.0784313725490196;1 1 1;1 1 1];
+            app.UIFigure.Position = [101 101 640 480];
+            app.UIFigure.Name = 'UI Figure';
+
+            % Create PoiatonpolomerkstreduprvhozvituLabel
+            app.PoiatonpolomerkstreduprvhozvituLabel = uilabel(app.UIFigure);
+            app.PoiatonpolomerkstreduprvhozvituLabel.HorizontalAlignment = 'right';
+            app.PoiatonpolomerkstreduprvhozvituLabel.VerticalAlignment = 'center';
+            app.PoiatonpolomerkstreduprvhozvituLabel.FontSize = 14;
+            app.PoiatonpolomerkstreduprvhozvituLabel.Position = [75 413 291 18];
+            app.PoiatonpolomerkstreduprvhozvituLabel.Text = 'Počiatočný polomer (k stredu prvého závitu) ';
+
+            % Create Polomer1
+            app.Polomer1 = uieditfield(app.UIFigure, 'numeric');
+            app.Polomer1.ValueChangedFcn = createCallbackFcn(app, @Polomer1ValueChanged, true);
+            app.Polomer1.Limits = [0 Inf];
+            app.Polomer1.HorizontalAlignment = 'center';
+            app.Polomer1.FontSize = 14;
+            app.Polomer1.Position = [381 409 54 22];
+
+            % Create KonenpolomerkstreduposlednhozvituLabel
+            app.KonenpolomerkstreduposlednhozvituLabel = uilabel(app.UIFigure);
+            app.KonenpolomerkstreduposlednhozvituLabel.HorizontalAlignment = 'right';
+            app.KonenpolomerkstreduposlednhozvituLabel.FontSize = 14;
+            app.KonenpolomerkstreduposlednhozvituLabel.Position = [60 375 304 18];
+            app.KonenpolomerkstreduposlednhozvituLabel.Text = 'Konečný polomer (k stredu posledného závitu)';
+
+            % Create Polomer2
+            app.Polomer2 = uieditfield(app.UIFigure, 'numeric');
+            app.Polomer2.ValueChangedFcn = createCallbackFcn(app, @Polomer2ValueChanged, true);
+            app.Polomer2.Limits = [0 Inf];
+            app.Polomer2.ValueDisplayFormat = '%.2f';
+            app.Polomer2.HorizontalAlignment = 'center';
+            app.Polomer2.FontSize = 14;
+            app.Polomer2.Position = [381 374 54 22];
+
+            % Create LabelNumericEditField3
+            app.LabelNumericEditField3 = uilabel(app.UIFigure);
+            app.LabelNumericEditField3.HorizontalAlignment = 'right';
+            app.LabelNumericEditField3.FontSize = 14;
+            app.LabelNumericEditField3.Position = [121 341 90 18];
+            app.LabelNumericEditField3.Text = 'Šírka vodičov';
+
+            % Create Sirka
+            app.Sirka = uieditfield(app.UIFigure, 'numeric');
+            app.Sirka.ValueChangedFcn = createCallbackFcn(app, @SirkaValueChanged, true);
+            app.Sirka.HorizontalAlignment = 'center';
+            app.Sirka.Position = [230 340 54 22];
+            app.Sirka.Value = 0.8;
+
+            % Create rkamedzerymedzivodimiLabel
+            app.rkamedzerymedzivodimiLabel = uilabel(app.UIFigure);
+            app.rkamedzerymedzivodimiLabel.HorizontalAlignment = 'right';
+            app.rkamedzerymedzivodimiLabel.FontSize = 14;
+            app.rkamedzerymedzivodimiLabel.Position = [24 301 192 18];
+            app.rkamedzerymedzivodimiLabel.Text = 'Šírka medzery medzi vodičmi';
+
+            % Create Medzera
+            app.Medzera = uieditfield(app.UIFigure, 'numeric');
+            app.Medzera.ValueChangedFcn = createCallbackFcn(app, @MedzeraValueChanged, true);
+            app.Medzera.HorizontalAlignment = 'center';
+            app.Medzera.Position = [229 301 54 22];
+            app.Medzera.Value = 0.8;
+
+            % Create LabelNumericEditField5
+            app.LabelNumericEditField5 = uilabel(app.UIFigure);
+            app.LabelNumericEditField5.HorizontalAlignment = 'right';
+            app.LabelNumericEditField5.FontSize = 14;
+            app.LabelNumericEditField5.Position = [111 261 103 18];
+            app.LabelNumericEditField5.Text = 'Hrúbka vodičov';
+
+            % Create HrubkaV
+            app.HrubkaV = uieditfield(app.UIFigure, 'numeric');
+            app.HrubkaV.ValueChangedFcn = createCallbackFcn(app, @HrubkaVValueChanged, true);
+            app.HrubkaV.HorizontalAlignment = 'center';
+            app.HrubkaV.Position = [229 260 54 22];
+            app.HrubkaV.Value = 0.07;
+
+            % Create LabelNumericEditField6
+            app.LabelNumericEditField6 = uilabel(app.UIFigure);
+            app.LabelNumericEditField6.HorizontalAlignment = 'right';
+            app.LabelNumericEditField6.FontSize = 14;
+            app.LabelNumericEditField6.Position = [111 221 104 18];
+            app.LabelNumericEditField6.Text = 'Hrúbka 1.vrstvy';
+
+            % Create Hrubka1
+            app.Hrubka1 = uieditfield(app.UIFigure, 'numeric');
+            app.Hrubka1.ValueChangedFcn = createCallbackFcn(app, @Hrubka1ValueChanged, true);
+            app.Hrubka1.HorizontalAlignment = 'center';
+            app.Hrubka1.Position = [230 220 54 22];
+            app.Hrubka1.Value = 0.195;
+
+            % Create LabelNumericEditField7
+            app.LabelNumericEditField7 = uilabel(app.UIFigure);
+            app.LabelNumericEditField7.HorizontalAlignment = 'right';
+            app.LabelNumericEditField7.FontSize = 14;
+            app.LabelNumericEditField7.Position = [111 181 104 18];
+            app.LabelNumericEditField7.Text = 'Hrúbka 2.vrstvy';
+
+            % Create Hrubka2
+            app.Hrubka2 = uieditfield(app.UIFigure, 'numeric');
+            app.Hrubka2.ValueChangedFcn = createCallbackFcn(app, @Hrubka2ValueChanged, true);
+            app.Hrubka2.HorizontalAlignment = 'center';
+            app.Hrubka2.Position = [230 180 54 22];
+            app.Hrubka2.Value = 1.2;
+
+            % Create LabelNumericEditField8
+            app.LabelNumericEditField8 = uilabel(app.UIFigure);
+            app.LabelNumericEditField8.HorizontalAlignment = 'right';
+            app.LabelNumericEditField8.FontSize = 14;
+            app.LabelNumericEditField8.Position = [111 142 104 18];
+            app.LabelNumericEditField8.Text = 'Hrúbka 3.vrstvy';
+
+            % Create Hrubka3
+            app.Hrubka3 = uieditfield(app.UIFigure, 'numeric');
+            app.Hrubka3.ValueChangedFcn = createCallbackFcn(app, @Hrubka3ValueChanged, true);
+            app.Hrubka3.HorizontalAlignment = 'center';
+            app.Hrubka3.Position = [230 141 54 22];
+            app.Hrubka3.Value = 0.195;
+
+            % Create VsledninduknoscievkyLabel
+            app.VsledninduknoscievkyLabel = uilabel(app.UIFigure);
+            app.VsledninduknoscievkyLabel.HorizontalAlignment = 'right';
+            app.VsledninduknoscievkyLabel.FontSize = 16;
+            app.VsledninduknoscievkyLabel.FontWeight = 'bold';
+            app.VsledninduknoscievkyLabel.FontColor = [1 0 0];
+            app.VsledninduknoscievkyLabel.Position = [70 18 222 20];
+            app.VsledninduknoscievkyLabel.Text = 'Výsledná indukčnosť cievky';
+
+            % Create Result
+            app.Result = uieditfield(app.UIFigure, 'numeric');
+            app.Result.ValueDisplayFormat = '%.4f';
+            app.Result.Editable = 'off';
+            app.Result.HorizontalAlignment = 'center';
+            app.Result.Position = [335 21 100 22];
+
+            % Create mmLabel_9
+            app.mmLabel_9 = uilabel(app.UIFigure);
+            app.mmLabel_9.FontName = 'Times New Roman';
+            app.mmLabel_9.FontSize = 14;
+            app.mmLabel_9.Position = [460 411 37 18];
+            app.mmLabel_9.Text = '[mm]';
+
+            % Create mmLabel_10
+            app.mmLabel_10 = uilabel(app.UIFigure);
+            app.mmLabel_10.FontName = 'Times New Roman';
+            app.mmLabel_10.FontSize = 14;
+            app.mmLabel_10.Position = [460 378 37 18];
+            app.mmLabel_10.Text = '[mm]';
+
+            % Create mmLabel_3
+            app.mmLabel_3 = uilabel(app.UIFigure);
+            app.mmLabel_3.FontName = 'Times New Roman';
+            app.mmLabel_3.FontSize = 14;
+            app.mmLabel_3.Position = [305 344 37 18];
+            app.mmLabel_3.Text = '[mm]';
+
+            % Create mmLabel_4
+            app.mmLabel_4 = uilabel(app.UIFigure);
+            app.mmLabel_4.FontName = 'Times New Roman';
+            app.mmLabel_4.FontSize = 14;
+            app.mmLabel_4.Position = [306 305 37 18];
+            app.mmLabel_4.Text = '[mm]';
+
+            % Create mmLabel_5
+            app.mmLabel_5 = uilabel(app.UIFigure);
+            app.mmLabel_5.FontName = 'Times New Roman';
+            app.mmLabel_5.FontSize = 14;
+            app.mmLabel_5.Position = [306 264 37 18];
+            app.mmLabel_5.Text = '[mm]';
+
+            % Create mmLabel_6
+            app.mmLabel_6 = uilabel(app.UIFigure);
+            app.mmLabel_6.FontName = 'Times New Roman';
+            app.mmLabel_6.FontSize = 14;
+            app.mmLabel_6.Position = [305 221 37 18];
+            app.mmLabel_6.Text = '[mm]';
+
+            % Create mmLabel_7
+            app.mmLabel_7 = uilabel(app.UIFigure);
+            app.mmLabel_7.FontName = 'Times New Roman';
+            app.mmLabel_7.FontSize = 14;
+            app.mmLabel_7.Position = [305 184 37 18];
+            app.mmLabel_7.Text = '[mm]';
+
+            % Create mmLabel_8
+            app.mmLabel_8 = uilabel(app.UIFigure);
+            app.mmLabel_8.FontName = 'Times New Roman';
+            app.mmLabel_8.FontSize = 14;
+            app.mmLabel_8.Position = [305 145 37 18];
+            app.mmLabel_8.Text = '[mm]';
+
+            % Create HLabel
+            app.HLabel = uilabel(app.UIFigure);
+            app.HLabel.FontName = 'Times New Roman';
+            app.HLabel.FontSize = 14;
+            app.HLabel.Position = [463 23 33 18];
+            app.HLabel.Text = '[?H]';
+
+            % Create Poetzvitovv1a3vrstveEditFieldLabel
+            app.Poetzvitovv1a3vrstveEditFieldLabel = uilabel(app.UIFigure);
+            app.Poetzvitovv1a3vrstveEditFieldLabel.HorizontalAlignment = 'right';
+            app.Poetzvitovv1a3vrstveEditFieldLabel.FontSize = 14;
+            app.Poetzvitovv1a3vrstveEditFieldLabel.FontColor = [0 0 1];
+            app.Poetzvitovv1a3vrstveEditFieldLabel.Position = [130 90 186 18];
+            app.Poetzvitovv1a3vrstveEditFieldLabel.Text = 'Počet závitov v 1. a 3. vrstve';
+
+            % Create Zavity1
+            app.Zavity1 = uieditfield(app.UIFigure, 'numeric');
+            app.Zavity1.ValueChangedFcn = createCallbackFcn(app, @Zavity1ValueChanged, true);
+            app.Zavity1.Editable = 'off';
+            app.Zavity1.HorizontalAlignment = 'center';
+            app.Zavity1.FontSize = 14;
+            app.Zavity1.FontColor = [0 0 1];
+            app.Zavity1.Position = [331 89 100 22];
+
+            % Create Poetzvitovv2a4vrstveEditFieldLabel
+            app.Poetzvitovv2a4vrstveEditFieldLabel = uilabel(app.UIFigure);
+            app.Poetzvitovv2a4vrstveEditFieldLabel.HorizontalAlignment = 'right';
+            app.Poetzvitovv2a4vrstveEditFieldLabel.FontSize = 14;
+            app.Poetzvitovv2a4vrstveEditFieldLabel.FontColor = [0 0 1];
+            app.Poetzvitovv2a4vrstveEditFieldLabel.Position = [130 59 186 18];
+            app.Poetzvitovv2a4vrstveEditFieldLabel.Text = 'Počet závitov v 2. a 4. vrstve';
+
+            % Create Zavity2
+            app.Zavity2 = uieditfield(app.UIFigure, 'numeric');
+            app.Zavity2.ValueChangedFcn = createCallbackFcn(app, @Zavity2ValueChanged, true);
+            app.Zavity2.Editable = 'off';
+            app.Zavity2.HorizontalAlignment = 'center';
+            app.Zavity2.FontSize = 14;
+            app.Zavity2.FontColor = [0 0 1];
+            app.Zavity2.Position = [331 58 100 22];
+
+            % Create Vpoetinduknostiplanrnejcievky4vrstvyLabel
+            app.Vpoetinduknostiplanrnejcievky4vrstvyLabel = uilabel(app.UIFigure);
+            app.Vpoetinduknostiplanrnejcievky4vrstvyLabel.FontSize = 22;
+            app.Vpoetinduknostiplanrnejcievky4vrstvyLabel.FontWeight = 'bold';
+            app.Vpoetinduknostiplanrnejcievky4vrstvyLabel.Position = [93 452 512 29];
+            app.Vpoetinduknostiplanrnejcievky4vrstvyLabel.Text = 'Výpočet indukčnosti planárnej cievky (4 vrstvy)';
+
+            % Create ZadapoetzvitovLabel
+            app.ZadapoetzvitovLabel = uilabel(app.UIFigure);
+            app.ZadapoetzvitovLabel.HorizontalAlignment = 'right';
+            app.ZadapoetzvitovLabel.FontSize = 14;
+            app.ZadapoetzvitovLabel.FontWeight = 'bold';
+            app.ZadapoetzvitovLabel.Position = [381 224 146 18];
+            app.ZadapoetzvitovLabel.Text = 'Zadať počet závitov ';
+
+            % Create Zavity
+            app.Zavity = uieditfield(app.UIFigure, 'numeric');
+            app.Zavity.ValueChangedFcn = createCallbackFcn(app, @ZavityValueChanged, true);
+            app.Zavity.HorizontalAlignment = 'center';
+            app.Zavity.FontSize = 14;
+            app.Zavity.FontWeight = 'bold';
+            app.Zavity.Position = [546 222 49 22];
+
+            % Create Label
+            app.Label = uilabel(app.UIFigure);
+            app.Label.HorizontalAlignment = 'center';
+            app.Label.FontSize = 48;
+            app.Label.Position = [380.5 264 46 63];
+            app.Label.Text = '!!!';
+
+            % Create TextArea
+            app.TextArea = uitextarea(app.UIFigure);
+            app.TextArea.HorizontalAlignment = 'center';
+            app.TextArea.BackgroundColor = [0.902 0.902 0.902];
+            app.TextArea.Position = [434 264 164 63];
+            app.TextArea.Value = {'Ak chcete pracovať s konečným polomerom je potrebné nastaviť počet závitov na hodnotu 0'};
+        end
+    end
+
+    methods (Access = public)
+
+        % Construct app
+        function app = PP_Final
+
+            % Create and configure components
+            createComponents(app)
+
+            % Register the app with App Designer
+            registerApp(app, app.UIFigure)
+
+            % Execute the startup function
+            runStartupFcn(app, @startupFcn)
+
+            if nargout == 0
+                clear app
+            end
+        end
+
+        % Code that executes before app deletion
+        function delete(app)
+
+            % Delete UIFigure when app is deleted
+            delete(app.UIFigure)
+        end
+    end
+end
